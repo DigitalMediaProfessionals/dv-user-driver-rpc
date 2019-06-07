@@ -376,8 +376,12 @@ bool process_command(int sc, struct sockaddr_in& sin) {
       RECV(&size, 8);
       uint8_t flags = 0;
       RECV(&flags, 1);
-      RECV((uint8_t*)(size_t)ptr + (size_t)offs, (size_t)size);
-      int32_t res = dmp_dv_mem_to_device((dmp_dv_mem)(size_t)mem, (size_t)offs, (size_t)size, flags & 1, (flags >> 1) & 1);
+      const int cpu_wont_read = flags & 1;
+      const int as_device_output = (flags >> 1) & 1;
+      if (!as_device_output) {
+        RECV((uint8_t*)(size_t)ptr + (size_t)offs, (size_t)size);
+      }
+      int32_t res = dmp_dv_mem_to_device((dmp_dv_mem)(size_t)mem, (size_t)offs, (size_t)size, cpu_wont_read, as_device_output);
       SEND(&res, 4, false);
       break;
     }

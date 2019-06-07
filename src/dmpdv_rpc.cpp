@@ -420,8 +420,10 @@ class Connection : public Base {
     SEND(&offs, 8, true);
     SEND(&size, 8, true);
     uint8_t flags = (cpu_wont_read ? 1 : 0) | (as_device_output ? 2 : 0);
-    SEND(&flags, 1, true);
-    SEND(local_ptr + offs, size, false);
+    SEND(&flags, 1, as_device_output ? false : true);
+    if (!as_device_output) {
+      SEND(local_ptr + offs, size, false);
+    }
 
     RECV(&retval, 4);
     if (retval) {
