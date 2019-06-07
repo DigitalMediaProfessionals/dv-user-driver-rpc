@@ -54,6 +54,7 @@ static const char *server_magic = "zCHyB7Lp1A4LheWbe+UhBWfXA9FkY0ZR6VmaVcp4V2eLY
 static char s_time[64];
 
 static inline const char *format_time() {
-  strftime(s_time, sizeof(s_time), "%Y%m%d-%H%M%S", localtime(NULL));
+  time_t t = time(NULL);
+  strftime(s_time, sizeof(s_time), "%Y%m%d-%H%M%S", localtime(&t));
   return s_time;
 }
