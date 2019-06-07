@@ -360,7 +360,7 @@ bool process_command(int sc, struct sockaddr_in& sin) {
       }
       RECV((uint8_t*)&cmd.header + sizeof(cmd.header), cmd.header.size - sizeof(cmd.header));
       int32_t res = dmp_dv_cmdlist_add_raw((dmp_dv_cmdlist)(size_t)cmdlist, &cmd.header);
-      LOG("%s: dmp_dv_cmdlist_add_raw(): size=%u res=%d", format_time(), (unsigned)cmd.header.size, (int)res);
+      LOG("%s: dmp_dv_cmdlist_add_raw(): size=%u res=%d\n", format_time(), (unsigned)cmd.header.size, (int)res);
       SEND(&res, 4, false);
       break;
     }
@@ -594,6 +594,7 @@ int main(int argc, char **argv) {
       }
       if (pid) {  // parent
         clients->emplace(std::make_pair(pid, sin));
+        close(sc);  // close client socket
         continue;
       }
       delete clients;

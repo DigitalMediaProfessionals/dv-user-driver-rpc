@@ -584,8 +584,8 @@ class Connection : public Base {
     SEND(&remote_handle_mem, 8, false);
     uint8_t res = 0xFF;
     RECV(&res, 1);
-    if (res != 1) {
-      set_last_error_message("dmp_dv_mem_unmap(): protocol error");
+    if (res) {
+      set_last_error_message("dmp_dv_mem_unmap(): protocol error: res=%d", (int)res);
       ERR("%s\n", get_last_error_message());
       return false;
     }
