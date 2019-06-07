@@ -23,6 +23,7 @@ dmpdv_server:	src/dmpdv_server.cpp
 
 clean:
 	rm -f *.o libdmpdv_rpc.so dmpdv_server
+	$(MAKE) -C dv-user-driver clean
 
 .SILENT:	install install_lib install_server
 
