@@ -23,7 +23,7 @@ Now it'll be possible to compile and run applications using dv-user-driver API d
 
 ```bash
 make dmpdv_server
-sudo make install
+sudo make install_server
 ```
 
 * It will copy `dmpdv_server` binary to `/usr/local/bin`.
