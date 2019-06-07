@@ -890,16 +890,16 @@ class Connection : public Base {
     n = 1;
     setsockopt(sc_, SOL_TCP, TCP_NODELAY, &n, sizeof(n));
 
-    char buf[MAGIC_MAX];
     n = strlen(client_magic);
     if (n > MAGIC_MAX) {
       n = MAGIC_MAX;
     }
-    SEND(buf, n, false);
+    SEND(client_magic, n, false);
     n = strlen(server_magic);
     if (n > MAGIC_MAX) {
       n = MAGIC_MAX;
     }
+    char buf[MAGIC_MAX];
     RECV(buf, n);
     if (memcmp(buf, server_magic, n)) {
       ERR("Wrong magic packet received\n");
@@ -1165,7 +1165,7 @@ dmp_dv_cmdlist Context::CreateCmdList() {
     set_last_error_message("Failed to allocate %zu bytes of host memory", sizeof(CmdList));
     return NULL;
   }
-  return (dmp_dv_cmdlist)(size_t)remote_handle_cmdlist;
+  return (dmp_dv_cmdlist)cmdlist;
 }
 
 
@@ -1335,10 +1335,13 @@ int64_t dmp_dv_mem_get_total_size() {
 
 
 dmp_dv_cmdlist dmp_dv_cmdlist_create(dmp_dv_context ctx) {
+  DLOG("dmp_dv_cmdlist_create(): ENTER\n");
   if (!ctx) {
     return NULL;
   }
-  return ((Context*)ctx)->CreateCmdList();
+  dmp_dv_cmdlist res = ((Context*)ctx)->CreateCmdList();
+  DLOG("dmp_dv_cmdlist_create(): EXIT: res_local=%zu res_remote=%zu\n", (size_t)res, (size_t)(((CmdList*)res)->remote_handle_));
+  return res;
 }
 
 
@@ -1386,12 +1389,15 @@ int dmp_dv_cmdlist_wait(dmp_dv_cmdlist cmdlist, int64_t exec_id) {
 
 
 int dmp_dv_cmdlist_add_raw(dmp_dv_cmdlist cmdlist, struct dmp_dv_cmdraw *cmd) {
+  DLOG("dmp_dv_cmdlist_add_raw(): ENTER\n");
   if ((!cmdlist) || (!cmd) || (cmd->size < sizeof(struct dmp_dv_cmdraw))) {
     set_last_error_message("dmp_dv_cmdlist_add_raw(): EINVAL: cmdlist=%zu cmd=%zu cmd->size=%zu\n",
                            (size_t)cmdlist, (size_t)cmd, cmd ? (size_t)cmd->size : (size_t)0);
     return EINVAL;
   }
-  return ((CmdList*)cmdlist)->AddRaw(cmd);
+  int res = ((CmdList*)cmdlist)->AddRaw(cmd);
+  DLOG("dmp_dv_cmdlist_add_raw(): EXIT\n");
+  return res;
 }
 
 

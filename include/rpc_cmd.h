@@ -46,6 +46,12 @@ enum cmd_id_e {
 #define LOG(...) fprintf(stdout, __VA_ARGS__); fflush(stdout)
 #define ERR(...) fprintf(stderr, __VA_ARGS__); fflush(stderr)
 
+#if 0
+#define DLOG LOG
+#else
+#define DLOG(...)
+#endif
+
 #define MAGIC_MAX 256
 static const char *client_magic = "4ITTzFdXFtr4u777p5kkXTx87G63cGjtsEe8loSpOPJz4ir5ZgvQ43a69ZudBi6D";
 static const char *server_magic = "zCHyB7Lp1A4LheWbe+UhBWfXA9FkY0ZR6VmaVcp4V2eLY/fZ0xBlVGEr/+JmoJQB";
@@ -55,6 +61,6 @@ static char s_time[64];
 
 static inline const char *format_time() {
   time_t t = time(NULL);
-  strftime(s_time, sizeof(s_time), "%Y%m%d-%H%M%S", localtime(&t));
+  strftime(s_time, sizeof(s_time), "%Y%m%d%H%M%S", localtime(&t));
   return s_time;
 }

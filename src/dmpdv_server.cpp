@@ -52,9 +52,10 @@ struct ClientInfo {
 };
 
 
-static int sock_server = -1;
-static bool g_should_stop = false;
+static volatile int sock_server = -1;
+static volatile bool g_should_stop = false;
 static std::map<pid_t, ClientInfo> *clients;
+static bool separate_log = false;
 
 
 static bool recv_all(int sc, void *buf, size_t size) {
@@ -164,7 +165,7 @@ bool process_command(int sc, struct sockaddr_in& sin) {
       dmp_dv_context ctx = dmp_dv_context_create();
       uint64_t remote = (uint64_t)(size_t)ctx;
       SEND(&remote, 8, false);
-      LOG("%s: dmp_dv_context_create()\n", format_time());
+      LOG("%s: dmp_dv_context_create(): res=%zu\n", format_time(), (size_t)ctx);
       break;
     }
     case k_dmp_dv_context_release:
@@ -296,7 +297,7 @@ bool process_command(int sc, struct sockaddr_in& sin) {
       uint64_t ctx = 0;
       RECV(&ctx, 8);
       uint64_t cmdlist = (uint64_t)(size_t)dmp_dv_cmdlist_create((dmp_dv_context)(size_t)ctx);
-      LOG("%s: dmp_dv_cmdlist_create()\n", format_time());
+      LOG("%s: dmp_dv_cmdlist_create(): res=%zu\n", format_time(), (size_t)cmdlist);
       SEND(&cmdlist, 8, false);
       break;
     }
@@ -359,6 +360,7 @@ bool process_command(int sc, struct sockaddr_in& sin) {
       }
       RECV((uint8_t*)&cmd.header + sizeof(cmd.header), cmd.header.size - sizeof(cmd.header));
       int32_t res = dmp_dv_cmdlist_add_raw((dmp_dv_cmdlist)(size_t)cmdlist, &cmd.header);
+      LOG("%s: dmp_dv_cmdlist_add_raw(): size=%u res=%d", format_time(), (unsigned)cmd.header.size, (int)res);
       SEND(&res, 4, false);
       break;
     }
@@ -439,22 +441,24 @@ bool authorize(int sc, struct sockaddr_in& sin) {
 
 
 int communicate(int sc, struct sockaddr_in& sin) {
-  char fnme[64];
-  snprintf(fnme, sizeof(fnme), "%d.%d.%d.%d.%d.log",
-           (int)(sin.sin_addr.s_addr & 0xFF), (int)((sin.sin_addr.s_addr >> 8) & 0xFF),
-           (int)((sin.sin_addr.s_addr >> 16) & 0xFF), (int)((sin.sin_addr.s_addr >> 24) & 0xFF),
-           (int)ntohs(sin.sin_port));
-  int fout = open(fnme, O_WRONLY | O_CREAT | O_TRUNC, 0644);
-  if (fout > 2) {
-    close(2);
-    close(1);
-    dup2(fout, 1);
-    dup2(fout, 2);
-    close(fout);
+  if (separate_log) {
+    char fnme[64];
+    snprintf(fnme, sizeof(fnme), "%d.%d.%d.%d.%d.log",
+             (int)(sin.sin_addr.s_addr & 0xFF), (int)((sin.sin_addr.s_addr >> 8) & 0xFF),
+             (int)((sin.sin_addr.s_addr >> 16) & 0xFF), (int)((sin.sin_addr.s_addr >> 24) & 0xFF),
+             (int)ntohs(sin.sin_port));
+    int fout = open(fnme, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    if (fout > 2) {
+      close(2);
+      close(1);
+      dup2(fout, 1);
+      dup2(fout, 2);
+      close(fout);
+    }
   }
 
-  LOG("%s: PID=%d\t", format_time(), (int)getpid());
-  LOG("%d.%d.%d.%d:%d\n",
+  LOG("%s: Client connected: PID=%d ADDR=%d.%d.%d.%d:%d\n",
+      format_time(), (int)getpid(),
       (int)(sin.sin_addr.s_addr & 0xFF), (int)((sin.sin_addr.s_addr >> 8) & 0xFF),
       (int)((sin.sin_addr.s_addr >> 16) & 0xFF), (int)((sin.sin_addr.s_addr >> 24) & 0xFF),
       (int)ntohs(sin.sin_port));
@@ -465,6 +469,7 @@ int communicate(int sc, struct sockaddr_in& sin) {
   setsockopt(sc, SOL_TCP, TCP_NODELAY, &n, sizeof(n));
 
   if (!authorize(sc, sin)) {
+    close(sc);
     _exit(-1);
     return -1;
   }
@@ -473,7 +478,12 @@ int communicate(int sc, struct sockaddr_in& sin) {
     // Empty by design
   }
 
-  LOG("Client will now exit\n");
+  LOG("%s: Client will now exit: PID=%d ADDR=%d.%d.%d.%d:%d\n",
+      format_time(), (int)getpid(),
+      (int)(sin.sin_addr.s_addr & 0xFF), (int)((sin.sin_addr.s_addr >> 8) & 0xFF),
+      (int)((sin.sin_addr.s_addr >> 16) & 0xFF), (int)((sin.sin_addr.s_addr >> 24) & 0xFF),
+      (int)ntohs(sin.sin_port));
+  close(sc);
   _exit(0);
   return 0;
 }
@@ -481,7 +491,11 @@ int communicate(int sc, struct sockaddr_in& sin) {
 
 void on_sigint(int s) {
   g_should_stop = true;
-  close(sock_server);
+  if (sock_server != -1) {
+    int sock = sock_server;
+    sock_server = -1;
+    close(sock);
+  }
 }
 
 
@@ -502,10 +516,13 @@ void on_sigchld(int s) {
 int main(int argc, char **argv) {
   if (argc < 2) {
     ERR("USAGE: ./dmpdv_server PORT [IP]\n"
-        "Example: ./dmpdv_server 5555\n");
+        "Examples: ./dmpdv_server 5555\n"
+        "env SEPARATE_LOG=1 ./dmpdv_server 5555 0.0.0.0\n");
     _exit(EINVAL);
     return EINVAL;
   }
+  const char *s_log = getenv("SEPARATE_LOG");
+  separate_log = s_log ? (atoi(s_log) == 1) : false;
   const int port = atoi(argv[1]);
   const char *ip = argc > 2 ? argv[2] : "0.0.0.0";
 
@@ -613,6 +630,11 @@ int main(int argc, char **argv) {
   LOG("%s: Server will now prepare for exit\n", format_time());
 
   g_should_stop = true;
+  if (sock_server != -1) {
+    int sock = sock_server;
+    sock_server = -1;
+    close(sock);
+  }
 
   LOG("%s: Killing %zu children...\n", format_time(), clients->size());
   for (auto it = clients->begin(); it != clients->end(); ++it) {
