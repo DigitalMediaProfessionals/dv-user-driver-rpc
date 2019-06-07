@@ -126,6 +126,7 @@ class Connection : public Base {
 
   void Disconnect() {
     if (Connected()) {
+      DLOG("Closing the connection\n");
       close(sc_);
       sc_ = -1;
     }
@@ -333,7 +334,7 @@ class Connection : public Base {
     int32_t retval = -1;
     bool res = mem_to_device_locked(remote_handle_mem, remote_ptr, local_ptr,
                                     offs, size, cpu_wont_read, as_device_output, retval);
-    if (res) {
+    if (!res) {
       Disconnect();
     }
     Unlock();
@@ -346,7 +347,7 @@ class Connection : public Base {
     int32_t retval = -1;
     bool res = mem_to_cpu_locked(remote_handle_mem, remote_ptr, local_ptr,
                                  offs, size, cpu_hadnt_read, retval);
-    if (res) {
+    if (!res) {
       Disconnect();
     }
     Unlock();
@@ -357,7 +358,7 @@ class Connection : public Base {
     Lock();
     int32_t retval = -1;
     bool res = device_exists_locked(remote_handle, dev_type_id, retval);
-    if (res) {
+    if (!res) {
       Disconnect();
     }
     Unlock();
@@ -366,6 +367,10 @@ class Connection : public Base {
 
  protected:
   bool device_exists_locked(uint64_t remote_handle, int32_t dev_type_id, int32_t& retval) {
+    if (!Connected()) {
+      return false;
+    }
+
     uint8_t cmd_id = k_dmp_dv_device_exists;
     SEND(&cmd_id, 1, true);
     SEND(&remote_handle, 8, true);
@@ -380,6 +385,10 @@ class Connection : public Base {
 
   bool mem_to_cpu_locked(uint64_t remote_handle_mem, uint64_t remote_ptr, uint8_t *local_ptr,
                          uint64_t offs, uint64_t size, int cpu_hadnt_read, int32_t& retval) {
+    if (!Connected()) {
+      return false;
+    }
+
     uint8_t cmd_id = k_dmp_dv_mem_to_cpu;
     SEND(&cmd_id, 1, true);
     SEND(&remote_handle_mem, 8, true);
@@ -387,7 +396,7 @@ class Connection : public Base {
     SEND(&offs, 8, true);
     SEND(&size, 8, true);
     uint8_t flags = (cpu_hadnt_read ? 1 : 0);
-    SEND(&flags, 1, true);
+    SEND(&flags, 1, false);
 
     RECV(&retval, 4);
     if (retval) {
@@ -400,6 +409,10 @@ class Connection : public Base {
 
   bool mem_to_device_locked(uint64_t remote_handle_mem, uint64_t remote_ptr, uint8_t *local_ptr,
                             uint64_t offs, uint64_t size, int cpu_wont_read, int as_device_output, int32_t& retval) {
+    if (!Connected()) {
+      return false;
+    }
+
     uint8_t cmd_id = k_dmp_dv_mem_to_device;
     SEND(&cmd_id, 1, true);
     SEND(&remote_handle_mem, 8, true);
@@ -418,6 +431,10 @@ class Connection : public Base {
   }
 
   int cmdlist_add_raw_locked(uint64_t remote_handle_cmdlist, struct dmp_dv_cmdraw *cmd, int32_t& retval) {
+    if (!Connected()) {
+      return false;
+    }
+
     uint8_t cmd_id = k_dmp_dv_cmdlist_add_raw;
     SEND(&cmd_id, 1, true);
     SEND(&remote_handle_cmdlist, 8, true);
@@ -431,6 +448,10 @@ class Connection : public Base {
   }
 
   bool cmdlist_wait_locked(uint64_t remote_handle_cmdlist, int64_t exec_id, int64_t& last_exec_time, int32_t& retval) {
+    if (!Connected()) {
+      return false;
+    }
+
     uint8_t cmd_id = k_dmp_dv_cmdlist_wait;
     SEND(&cmd_id, 1, true);
     SEND(&remote_handle_cmdlist, 8, true);
@@ -446,6 +467,10 @@ class Connection : public Base {
   }
 
   bool cmdlist_exec_locked(uint64_t remote_handle_cmdlist, int64_t& retval) {
+    if (!Connected()) {
+      return false;
+    }
+
     uint8_t cmd_id = k_dmp_dv_cmdlist_exec;
     SEND(&cmd_id, 1, true);
     SEND(&remote_handle_cmdlist, 8, false);
@@ -458,6 +483,10 @@ class Connection : public Base {
   }
 
   bool cmdlist_commit_locked(uint64_t remote_handle_cmdlist, int32_t& retval) {
+    if (!Connected()) {
+      return false;
+    }
+
     uint8_t cmd_id = k_dmp_dv_cmdlist_commit;
     SEND(&cmd_id, 1, true);
     SEND(&remote_handle_cmdlist, 8, false);
@@ -1396,32 +1425,42 @@ int dmp_dv_cmdlist_add_raw(dmp_dv_cmdlist cmdlist, struct dmp_dv_cmdraw *cmd) {
     return EINVAL;
   }
   int res = ((CmdList*)cmdlist)->AddRaw(cmd);
-  DLOG("dmp_dv_cmdlist_add_raw(): EXIT\n");
+  DLOG("dmp_dv_cmdlist_add_raw(): EXIT: res=%d\n", res);
   return res;
 }
 
 
 int dmp_dv_mem_to_device(dmp_dv_mem remote_handle_mem, size_t offs, size_t size, int cpu_wont_read, int as_device_output) {
+  DLOG("dmp_dv_mem_to_device(): ENTER\n");
   if (!remote_handle_mem) {
+    DLOG("dmp_dv_mem_to_device(): EXIT: !remote_handle_mem\n");
     return -1;
   }
   Memory *obj = Memory::get_by_handle((uint64_t)remote_handle_mem);
   if (!obj) {
+    DLOG("dmp_dv_mem_to_device(): EXIT: !obj\n");
     return -1;
   }
-  return obj->MemToDevice(offs, size, cpu_wont_read, as_device_output);
+  int res = obj->MemToDevice(offs, size, cpu_wont_read, as_device_output);
+  DLOG("dmp_dv_mem_to_device(): EXIT: res=%d\n", res);
+  return res;
 }
 
 
 int dmp_dv_mem_to_cpu(dmp_dv_mem remote_handle_mem, size_t offs, size_t size, int cpu_hadnt_read) {
+  DLOG("dmp_dv_mem_to_cpu(): ENTER\n");
   if (!remote_handle_mem) {
+    DLOG("dmp_dv_mem_to_cpu(): EXIT: !remote_handle_mem\n");
     return -1;
   }
   Memory *obj = Memory::get_by_handle((uint64_t)remote_handle_mem);
   if (!obj) {
+    DLOG("dmp_dv_mem_to_cpu(): EXIT: !obj\n");
     return -1;
   }
-  return obj->MemToCPU(offs, size, cpu_hadnt_read);
+  int res = obj->MemToCPU(offs, size, cpu_hadnt_read);
+  DLOG("dmp_dv_mem_to_cpu(): EXIT: res=%d\n", res);
+  return res;
 }
 
 

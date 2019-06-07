@@ -13,11 +13,11 @@ weights_dil.o:	dv-user-driver/src/weights_dil.c
 weights_fc.o:	dv-user-driver/src/weights_fc.c
 	$(GCC) -c -fPIC dv-user-driver/src/weights_fc.c -o weights_fc.o -std=c99 -Wall -Wno-unused-function -Werror -I./dv-user-driver/include $(OPT)
 
-libdmpdv_rpc.so:	src/dmpdv_rpc.cpp weights_conv.o weights_dil.o weights_fc.o
+libdmpdv_rpc.so:	include/rpc_cmd.h src/dmpdv_rpc.cpp weights_conv.o weights_dil.o weights_fc.o
 	$(GPP) -c -fPIC src/dmpdv_rpc.cpp -o dmpdv_rpc.o -std=c++11 -Wall -Werror -I./include -I./dv-user-driver/include $(OPT)
 	$(GCC) -shared -fPIC dmpdv_rpc.o weights_conv.o weights_dil.o weights_fc.o -o libdmpdv_rpc.so $(OPT) -lstdc++
 
-dmpdv_server:	src/dmpdv_server.cpp
+dmpdv_server:	include/rpc_cmd.h src/dmpdv_server.cpp
 	$(MAKE) -C dv-user-driver libdmpdv.so
 	$(GPP) src/dmpdv_server.cpp -o dmpdv_server -std=c++11 -Wall -Werror -I./include -I./dv-user-driver/include $(OPT) -L./dv-user-driver -ldmpdv
 
