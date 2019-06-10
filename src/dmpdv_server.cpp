@@ -376,7 +376,7 @@ bool process_command(int sc, struct sockaddr_in& sin) {
       RECV(&size, 8);
       int32_t flags = 0;
       RECV(&flags, 4);
-      if (!(flags & DMP_DV_MEM_CPU_AS_DEV_OUTPUT)) {
+      if (!(flags & DMP_DV_MEM_AS_DEV_OUTPUT)) {
         RECV((uint8_t*)(size_t)ptr + (size_t)offs, (size_t)size);
       }
       int32_t res = dmp_dv_mem_to_device((dmp_dv_mem)(size_t)mem, (size_t)offs, (size_t)size, flags);
