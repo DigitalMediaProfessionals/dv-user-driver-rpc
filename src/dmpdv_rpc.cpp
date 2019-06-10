@@ -329,11 +329,11 @@ class Connection : public Base {
   }
 
   int mem_to_device(uint64_t remote_handle_mem, uint64_t remote_ptr, uint8_t *local_ptr,
-                    uint64_t offs, uint64_t size, int cpu_wont_read, int as_device_output) {
+                    uint64_t offs, uint64_t size, int flags) {
     Lock();
     int32_t retval = -1;
     bool res = mem_to_device_locked(remote_handle_mem, remote_ptr, local_ptr,
-                                    offs, size, cpu_wont_read, as_device_output, retval);
+                                    offs, size, flags, retval);
     if (!res) {
       Disconnect();
     }
@@ -342,11 +342,11 @@ class Connection : public Base {
   }
 
   int mem_to_cpu(uint64_t remote_handle_mem, uint64_t remote_ptr, uint8_t *local_ptr,
-                 uint64_t offs, uint64_t size, int cpu_hadnt_read) {
+                 uint64_t offs, uint64_t size, int flags) {
     Lock();
     int32_t retval = -1;
     bool res = mem_to_cpu_locked(remote_handle_mem, remote_ptr, local_ptr,
-                                 offs, size, cpu_hadnt_read, retval);
+                                 offs, size, flags, retval);
     if (!res) {
       Disconnect();
     }
@@ -384,7 +384,7 @@ class Connection : public Base {
   }
 
   bool mem_to_cpu_locked(uint64_t remote_handle_mem, uint64_t remote_ptr, uint8_t *local_ptr,
-                         uint64_t offs, uint64_t size, int cpu_hadnt_read, int32_t& retval) {
+                         uint64_t offs, uint64_t size, int32_t flags, int32_t& retval) {
     if (!Connected()) {
       return false;
     }
@@ -395,8 +395,7 @@ class Connection : public Base {
     SEND(&remote_ptr, 8, true);
     SEND(&offs, 8, true);
     SEND(&size, 8, true);
-    uint8_t flags = (cpu_hadnt_read ? 1 : 0);
-    SEND(&flags, 1, false);
+    SEND(&flags, 4, false);
 
     RECV(&retval, 4);
     if (retval) {
@@ -408,7 +407,7 @@ class Connection : public Base {
   }
 
   bool mem_to_device_locked(uint64_t remote_handle_mem, uint64_t remote_ptr, uint8_t *local_ptr,
-                            uint64_t offs, uint64_t size, int cpu_wont_read, int as_device_output, int32_t& retval) {
+                            uint64_t offs, uint64_t size, int32_t flags, int32_t& retval) {
     if (!Connected()) {
       return false;
     }
@@ -419,9 +418,8 @@ class Connection : public Base {
     SEND(&remote_ptr, 8, true);
     SEND(&offs, 8, true);
     SEND(&size, 8, true);
-    uint8_t flags = (cpu_wont_read ? 1 : 0) | (as_device_output ? 2 : 0);
-    SEND(&flags, 1, as_device_output ? false : true);
-    if (!as_device_output) {
+    SEND(&flags, 4, flags & DMP_DV_MEM_AS_DEV_OUTPUT ? false : true);
+    if (!(flags & DMP_DV_MEM_AS_DEV_OUTPUT)) {
       SEND(local_ptr + offs, size, false);
     }
 
@@ -1054,7 +1052,7 @@ class Memory : public Base {
     return ctx_->conn_->mem_sync_end(remote_handle_, remote_ptr_, sz_, local_ptr_, rdwr_);
   }
 
-  int MemToDevice(size_t offs, size_t size, int cpu_wont_read, int as_device_output) {
+  int MemToDevice(size_t offs, size_t size, int flags) {
     if (offs + size > sz_) {
       set_last_error_message("Invalid memory range specified: offs=%zu size=%zu while memory buffer size is %zu",
                              offs, size, sz_);
@@ -1067,10 +1065,10 @@ class Memory : public Base {
       set_last_error_message("Memory must be mapped before starting synchronization");
       return EINVAL;
     }
-    return ctx_->conn_->mem_to_device(remote_handle_, remote_ptr_, local_ptr_, offs, size, cpu_wont_read, as_device_output);
+    return ctx_->conn_->mem_to_device(remote_handle_, remote_ptr_, local_ptr_, offs, size, flags);
   }
 
-  int MemToCPU(size_t offs, size_t size, int cpu_hadnt_read) {
+  int MemToCPU(size_t offs, size_t size, int flags) {
     if (offs + size > sz_) {
       set_last_error_message("Invalid memory range specified: offs=%zu size=%zu while memory buffer size is %zu",
                              offs, size, sz_);
@@ -1083,7 +1081,7 @@ class Memory : public Base {
       set_last_error_message("Memory must be mapped before starting synchronization");
       return EINVAL;
     }
-    return ctx_->conn_->mem_to_cpu(remote_handle_, remote_ptr_, local_ptr_, offs, size, cpu_hadnt_read);
+    return ctx_->conn_->mem_to_cpu(remote_handle_, remote_ptr_, local_ptr_, offs, size, flags);
   }
 
   static Memory* get_by_handle(uint64_t handle) {
@@ -1432,7 +1430,7 @@ int dmp_dv_cmdlist_add_raw(dmp_dv_cmdlist cmdlist, struct dmp_dv_cmdraw *cmd) {
 }
 
 
-int dmp_dv_mem_to_device(dmp_dv_mem remote_handle_mem, size_t offs, size_t size, int cpu_wont_read, int as_device_output) {
+int dmp_dv_mem_to_device(dmp_dv_mem remote_handle_mem, size_t offs, size_t size, int flags) {
   DLOG("dmp_dv_mem_to_device(): ENTER\n");
   if (!remote_handle_mem) {
     DLOG("dmp_dv_mem_to_device(): EXIT: !remote_handle_mem\n");
@@ -1443,13 +1441,13 @@ int dmp_dv_mem_to_device(dmp_dv_mem remote_handle_mem, size_t offs, size_t size,
     DLOG("dmp_dv_mem_to_device(): EXIT: !obj\n");
     return -1;
   }
-  int res = obj->MemToDevice(offs, size, cpu_wont_read, as_device_output);
+  int res = obj->MemToDevice(offs, size, flags);
   DLOG("dmp_dv_mem_to_device(): EXIT: res=%d\n", res);
   return res;
 }
 
 
-int dmp_dv_mem_to_cpu(dmp_dv_mem remote_handle_mem, size_t offs, size_t size, int cpu_hadnt_read) {
+int dmp_dv_mem_to_cpu(dmp_dv_mem remote_handle_mem, size_t offs, size_t size, int flags) {
   DLOG("dmp_dv_mem_to_cpu(): ENTER\n");
   if (!remote_handle_mem) {
     DLOG("dmp_dv_mem_to_cpu(): EXIT: !remote_handle_mem\n");
@@ -1460,7 +1458,7 @@ int dmp_dv_mem_to_cpu(dmp_dv_mem remote_handle_mem, size_t offs, size_t size, in
     DLOG("dmp_dv_mem_to_cpu(): EXIT: !obj\n");
     return -1;
   }
-  int res = obj->MemToCPU(offs, size, cpu_hadnt_read);
+  int res = obj->MemToCPU(offs, size, flags);
   DLOG("dmp_dv_mem_to_cpu(): EXIT: res=%d\n", res);
   return res;
 }

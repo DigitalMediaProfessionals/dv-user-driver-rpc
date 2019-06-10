@@ -374,14 +374,12 @@ bool process_command(int sc, struct sockaddr_in& sin) {
       RECV(&offs, 8);
       uint64_t size = 0;
       RECV(&size, 8);
-      uint8_t flags = 0;
-      RECV(&flags, 1);
-      const int cpu_wont_read = flags & 1;
-      const int as_device_output = (flags >> 1) & 1;
-      if (!as_device_output) {
+      int32_t flags = 0;
+      RECV(&flags, 4);
+      if (!(flags & DMP_DV_MEM_CPU_AS_DEV_OUTPUT)) {
         RECV((uint8_t*)(size_t)ptr + (size_t)offs, (size_t)size);
       }
-      int32_t res = dmp_dv_mem_to_device((dmp_dv_mem)(size_t)mem, (size_t)offs, (size_t)size, cpu_wont_read, as_device_output);
+      int32_t res = dmp_dv_mem_to_device((dmp_dv_mem)(size_t)mem, (size_t)offs, (size_t)size, flags);
       SEND(&res, 4, false);
       break;
     }
@@ -396,8 +394,8 @@ bool process_command(int sc, struct sockaddr_in& sin) {
       uint64_t size = 0;
       RECV(&size, 8);
       uint8_t flags = 0;
-      RECV(&flags, 1);
-      int32_t res = dmp_dv_mem_to_cpu((dmp_dv_mem)(size_t)mem, (size_t)offs, (size_t)size, flags & 1);
+      RECV(&flags, 4);
+      int32_t res = dmp_dv_mem_to_cpu((dmp_dv_mem)(size_t)mem, (size_t)offs, (size_t)size, flags);
       SEND(&res, 4, res ? false : true);
       if (!res) {
         SEND((uint8_t*)(size_t)ptr + (size_t)offs, (size_t)size, false);
