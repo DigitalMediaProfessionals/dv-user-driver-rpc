@@ -761,7 +761,7 @@ class Connection : public Base {
     RECV(&n, 4);
     if (n < 0) {
       set_last_error_message("Got invalid length of last error message: %d bytes\n", n);
-      return s_last_error_message;
+      return false;
     }
     if (n) {
       if (n > (int)sizeof(s_last_error_message) - 2) {
