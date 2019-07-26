@@ -371,8 +371,8 @@ class Connection : public Base {
       return false;
     }
 
-    uint8_t cmd_id = k_dmp_dv_device_exists;
-    SEND(&cmd_id, 1, true);
+    CMD_ID(cmd_id, k_dmp_dv_device_exists);
+    SEND(&cmd_id, sizeof(cmd_id), true);
     SEND(&remote_handle, 8, true);
     SEND(&dev_type_id, 4, false);
 
@@ -389,19 +389,25 @@ class Connection : public Base {
       return false;
     }
 
-    uint8_t cmd_id = k_dmp_dv_mem_to_cpu;
-    SEND(&cmd_id, 1, true);
+    DLOG("mem_to_cpu_locked: Before SEND\n");
+    CMD_ID(cmd_id, k_dmp_dv_mem_to_cpu);
+    SEND(&cmd_id, sizeof(cmd_id), true);
     SEND(&remote_handle_mem, 8, true);
     SEND(&remote_ptr, 8, true);
     SEND(&offs, 8, true);
     SEND(&size, 8, true);
     SEND(&flags, 4, false);
 
+    DLOG(" => Before RECV\n");
     RECV(&retval, 4);
+    DLOG(" => retval=%d\n", (int)retval);
     if (retval) {
+      DLOG(" => getting last error message\n");
       return get_last_error_message_locked();
     }
+    DLOG(" => receiving %zu bytes\n", (size_t)size);
     RECV(local_ptr + offs, size);
+    DLOG(" => received %zu bytes\n", (size_t)size);
 
     return true;
   }
@@ -412,8 +418,8 @@ class Connection : public Base {
       return false;
     }
 
-    uint8_t cmd_id = k_dmp_dv_mem_to_device;
-    SEND(&cmd_id, 1, true);
+    CMD_ID(cmd_id, k_dmp_dv_mem_to_device);
+    SEND(&cmd_id, sizeof(cmd_id), true);
     SEND(&remote_handle_mem, 8, true);
     SEND(&remote_ptr, 8, true);
     SEND(&offs, 8, true);
@@ -435,8 +441,8 @@ class Connection : public Base {
       return false;
     }
 
-    uint8_t cmd_id = k_dmp_dv_cmdlist_add_raw;
-    SEND(&cmd_id, 1, true);
+    CMD_ID(cmd_id, k_dmp_dv_cmdlist_add_raw);
+    SEND(&cmd_id, sizeof(cmd_id), true);
     SEND(&remote_handle_cmdlist, 8, true);
     SEND(cmd, cmd->size, false);
 
@@ -452,8 +458,8 @@ class Connection : public Base {
       return false;
     }
 
-    uint8_t cmd_id = k_dmp_dv_cmdlist_wait;
-    SEND(&cmd_id, 1, true);
+    CMD_ID(cmd_id, k_dmp_dv_cmdlist_wait);
+    SEND(&cmd_id, sizeof(cmd_id), true);
     SEND(&remote_handle_cmdlist, 8, true);
     SEND(&exec_id, 8, false);
 
@@ -471,8 +477,8 @@ class Connection : public Base {
       return false;
     }
 
-    uint8_t cmd_id = k_dmp_dv_cmdlist_exec;
-    SEND(&cmd_id, 1, true);
+    CMD_ID(cmd_id, k_dmp_dv_cmdlist_exec);
+    SEND(&cmd_id, sizeof(cmd_id), true);
     SEND(&remote_handle_cmdlist, 8, false);
 
     RECV(&retval, 8);
@@ -487,8 +493,8 @@ class Connection : public Base {
       return false;
     }
 
-    uint8_t cmd_id = k_dmp_dv_cmdlist_commit;
-    SEND(&cmd_id, 1, true);
+    CMD_ID(cmd_id, k_dmp_dv_cmdlist_commit);
+    SEND(&cmd_id, sizeof(cmd_id), true);
     SEND(&remote_handle_cmdlist, 8, false);
 
     RECV(&retval, 4);
@@ -503,8 +509,8 @@ class Connection : public Base {
       return false;
     }
 
-    uint8_t cmd_id = k_dmp_dv_cmdlist_release;
-    SEND(&cmd_id, 1, true);
+    CMD_ID(cmd_id, k_dmp_dv_cmdlist_release);
+    SEND(&cmd_id, sizeof(cmd_id), true);
     SEND(&remote_handle_cmdlist, 8, false);
 
     RECV(&retval, 4);
@@ -516,8 +522,8 @@ class Connection : public Base {
       return false;
     }
 
-    uint8_t cmd_id = k_dmp_dv_cmdlist_create;
-    SEND(&cmd_id, 1, true);
+    CMD_ID(cmd_id, k_dmp_dv_cmdlist_create);
+    SEND(&cmd_id, sizeof(cmd_id), true);
     SEND(&remote_handle, 8, false);
 
     RECV(&retval, 8);
@@ -533,8 +539,8 @@ class Connection : public Base {
       return false;
     }
 
-    uint8_t cmd_id = k_dmp_dv_mem_sync_end;
-    SEND(&cmd_id, 1, true);
+    CMD_ID(cmd_id, k_dmp_dv_mem_sync_end);
+    SEND(&cmd_id, sizeof(cmd_id), true);
     SEND(&remote_handle_mem, 8, true);
     SEND(&remote_ptr, 8, true);
     SEND(&sz, 8, true);
@@ -585,8 +591,8 @@ class Connection : public Base {
       }
     }
     rdwr = new_rdwr;
-    uint8_t cmd_id = k_dmp_dv_mem_sync_start;
-    SEND(&cmd_id, 1, true);
+    CMD_ID(cmd_id, k_dmp_dv_mem_sync_start);
+    SEND(&cmd_id, sizeof(cmd_id), true);
     SEND(&remote_handle_mem, 8, true);
     SEND(&remote_ptr, 8, true);
     SEND(&sz, 8, true);
@@ -608,8 +614,8 @@ class Connection : public Base {
       return false;
     }
 
-    uint8_t cmd_id = k_dmp_dv_mem_unmap;
-    SEND(&cmd_id, 1, true);
+    CMD_ID(cmd_id, k_dmp_dv_mem_unmap);
+    SEND(&cmd_id, sizeof(cmd_id), true);
     SEND(&remote_handle_mem, 8, false);
     uint8_t res = 0xFF;
     RECV(&res, 1);
@@ -626,8 +632,8 @@ class Connection : public Base {
       return false;
     }
 
-    uint8_t cmd_id = k_dmp_dv_mem_map;
-    SEND(&cmd_id, 1, true);
+    CMD_ID(cmd_id, k_dmp_dv_mem_map);
+    SEND(&cmd_id, sizeof(cmd_id), true);
     SEND(&remote_handle_mem, 8, false);
 
     RECV(&retval, 8);
@@ -642,8 +648,8 @@ class Connection : public Base {
       return false;
     }
 
-    uint8_t cmd_id = k_dmp_dv_mem_release;
-    SEND(&cmd_id, 1, true);
+    CMD_ID(cmd_id, k_dmp_dv_mem_release);
+    SEND(&cmd_id, sizeof(cmd_id), true);
     SEND(&remote_handle_mem, 8, false);
 
     RECV(&retval, 4);
@@ -655,8 +661,8 @@ class Connection : public Base {
       return false;
     }
 
-    uint8_t cmd_id = k_dmp_dv_mem_alloc;
-    SEND(&cmd_id, 1, true);
+    CMD_ID(cmd_id, k_dmp_dv_mem_alloc);
+    SEND(&cmd_id, sizeof(cmd_id), true);
     SEND(&remote_handle, 8, true);
     uint64_t sz = size;
     if (sz & 4095) {
@@ -677,8 +683,8 @@ class Connection : public Base {
       return false;
     }
 
-    uint8_t cmd_id = k_dmp_dv_context_get_info;
-    SEND(&cmd_id, 1, true);
+    CMD_ID(cmd_id, k_dmp_dv_context_get_info);
+    SEND(&cmd_id, sizeof(cmd_id), true);
     SEND(&remote_handle, 8, true);
     SEND(info, sizeof(*info), 0);
 
@@ -697,8 +703,8 @@ class Connection : public Base {
       return false;
     }
 
-    uint8_t cmd_id = k_dmp_dv_context_get_info_string;
-    SEND(&cmd_id, 1, true);
+    CMD_ID(cmd_id, k_dmp_dv_context_get_info_string);
+    SEND(&cmd_id, sizeof(cmd_id), true);
     SEND(&remote_handle, 8, false);
 
     int32_t n = -1;
@@ -726,8 +732,8 @@ class Connection : public Base {
       return false;
     }
 
-    uint8_t cmd_id = k_dmp_dv_context_release;
-    SEND(&cmd_id, 1, true);
+    CMD_ID(cmd_id, k_dmp_dv_context_release);
+    SEND(&cmd_id, sizeof(cmd_id), true);
     SEND(&remote_handle, 8, false);
     RECV(&n_ref, 4);
     return true;
@@ -741,8 +747,8 @@ class Connection : public Base {
       return false;
     }
 
-    uint8_t cmd_id = k_dmp_dv_context_create;
-    SEND(&cmd_id, 1, false);
+    CMD_ID(cmd_id, k_dmp_dv_context_create);
+    SEND(&cmd_id, sizeof(cmd_id), false);
     RECV(&remote_handle, 8);
     if (!remote_handle) {
       return get_last_error_message_locked();
@@ -755,8 +761,8 @@ class Connection : public Base {
       return false;
     }
 
-    uint8_t cmd_id = k_dmp_dv_get_last_error_message;
-    SEND(&cmd_id, 1, false);
+    CMD_ID(cmd_id, k_dmp_dv_get_last_error_message);
+    SEND(&cmd_id, sizeof(cmd_id), false);
     int32_t n = -1;
     RECV(&n, 4);
     if (n < 0) {
@@ -782,8 +788,8 @@ class Connection : public Base {
       return false;
     }
 
-    uint8_t cmd_id = k_dmp_dv_get_version_string;
-    SEND(&cmd_id, 1, false);
+    CMD_ID(cmd_id, k_dmp_dv_get_version_string);
+    SEND(&cmd_id, sizeof(cmd_id), false);
     int32_t n = -1;
     RECV(&n, 4);
     if (n < 0) {
@@ -809,7 +815,8 @@ class Connection : public Base {
   bool Recv(void *buf, size_t size) {
     ssize_t n = 0;
     for (size_t offs = 0; offs < size; offs += n) {
-      n = recv(sc_, (uint8_t*)buf + offs, size - offs, MSG_WAITALL);
+      DLOG("recv: offs=%zu size=%zu n=%zu\n", offs, size, size - offs > MAX_CHUNK ? MAX_CHUNK : size - offs);
+      n = recv(sc_, (uint8_t*)buf + offs, size - offs > MAX_CHUNK ? MAX_CHUNK : size - offs, 0/*MSG_WAITALL*/);
       if (n > 0) {
         continue;
       }
@@ -822,6 +829,7 @@ class Connection : public Base {
       }
       switch (errno) {
         case EINTR:
+          n = 0;
           continue;
         default:
           set_last_error_message("recv() failed: errno=%d: %s\n", errno, strerror(errno));
@@ -837,7 +845,8 @@ class Connection : public Base {
   bool Send(const void *buf, size_t size, bool more) {
     ssize_t n = 0;
     for (size_t offs = 0; offs < size; offs += n) {
-      n = send(sc_, (const uint8_t*)buf + offs, size - offs, more ? MSG_MORE : 0);
+      n = send(sc_, (const uint8_t*)buf + offs, size - offs > MAX_CHUNK ? MAX_CHUNK : size - offs,
+               ((more) || (size - offs > MAX_CHUNK)) ? MSG_MORE : 0);
       if (n > 0) {
         continue;
       }
@@ -850,6 +859,7 @@ class Connection : public Base {
       }
       switch (errno) {
         case EINTR:
+          n = 0;
           continue;
         default:
           set_last_error_message("send() failed: errno=%d: %s\n", errno, strerror(errno));

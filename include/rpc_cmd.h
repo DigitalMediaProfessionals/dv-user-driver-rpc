@@ -43,6 +43,20 @@ enum cmd_id_e {
   k_dmp_dv_device_exists
 };
 
+struct cmd_header {
+  uint8_t cmd_id;
+  uint8_t magic[7];
+};
+
+static const uint8_t cmd_magic[7] = {0x7f, 0x88, 0x11, 0xcd, 0x6d, 0x6b, 0x9b};
+
+#define CMD_ID(name, cmd_id) \
+  struct cmd_header name = {(cmd_id), {cmd_magic[0], cmd_magic[1], cmd_magic[2], cmd_magic[3], \
+                                       cmd_magic[4], cmd_magic[5], cmd_magic[6]}};
+
+#define CMD_OK(cmd) (!memcmp(&(cmd).magic, cmd_magic, sizeof(cmd_magic)))
+
+
 #define LOG(...) fprintf(stdout, __VA_ARGS__); fflush(stdout)
 #define ERR(...) fprintf(stderr, __VA_ARGS__); fflush(stderr)
 
@@ -64,3 +78,6 @@ static inline const char *format_time() {
   strftime(s_time, sizeof(s_time), "%Y%m%d%H%M%S", localtime(&t));
   return s_time;
 }
+
+
+#define MAX_CHUNK (1 << 20)

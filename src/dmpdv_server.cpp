@@ -61,7 +61,7 @@ static bool separate_log = false;
 static bool recv_all(int sc, void *buf, size_t size) {
   ssize_t n = 0;
   for (size_t offs = 0; offs < size; offs += n) {
-    n = recv(sc, (uint8_t*)buf + offs, size - offs, MSG_WAITALL);
+    n = recv(sc, (uint8_t*)buf + offs, size - offs > MAX_CHUNK ? MAX_CHUNK : size - offs, 0/*MSG_WAITALL*/);
     if (n > 0) {
       continue;
     }
@@ -71,6 +71,7 @@ static bool recv_all(int sc, void *buf, size_t size) {
     }
     switch (errno) {
       case EINTR:
+        n = 0;
         continue;
       default:
         ERR("%s: Socket error: errno=%d\n", format_time(), errno);
@@ -84,7 +85,10 @@ static bool recv_all(int sc, void *buf, size_t size) {
 static bool send_all(int sc, const void *buf, size_t size, bool more) {
   ssize_t n = 0;
   for (size_t offs = 0; offs < size; offs += n) {
-    n = send(sc, (const uint8_t*)buf + offs, size - offs, more ? MSG_MORE : 0);
+    DLOG("send: offs=%zu size=%zu n=%zu flags=%s\n", offs, size, size - offs > MAX_CHUNK ? MAX_CHUNK : size - offs,
+         ((more) || (size - offs > MAX_CHUNK)) ? "MSG_MORE" : "0");
+    n = send(sc, (const uint8_t*)buf + offs, size - offs > MAX_CHUNK ? MAX_CHUNK : size - offs,
+             ((more) || (size - offs > MAX_CHUNK)) ? MSG_MORE : 0);
     if (n > 0) {
       continue;
     }
@@ -94,6 +98,7 @@ static bool send_all(int sc, const void *buf, size_t size, bool more) {
     }
     switch (errno) {
       case EINTR:
+        n = 0;
         continue;
       default:
         ERR("%s: Socket error: errno=%d\n", format_time(), errno);
@@ -137,9 +142,13 @@ static int get_n_fd() {
 
 
 bool process_command(int sc, struct sockaddr_in& sin) {
-  uint8_t cmd_id;
-  RECV(&cmd_id, 1);
-  switch (cmd_id) {
+  struct cmd_header cmd_hdr;
+  RECV(&cmd_hdr, sizeof(cmd_hdr));
+  if (!CMD_OK(cmd_hdr)) {
+    ERR("%s: Received invalid cmd header\n", format_time());
+    return false;
+  }
+  switch (cmd_hdr.cmd_id) {
     case k_dmp_dv_get_version_string:
     {
       const char *msg = dmp_dv_get_version_string();
@@ -377,7 +386,7 @@ bool process_command(int sc, struct sockaddr_in& sin) {
       int32_t flags = 0;
       RECV(&flags, 4);
       if (!(flags & DMP_DV_MEM_AS_DEV_OUTPUT)) {
-        RECV((uint8_t*)(size_t)ptr + (size_t)offs, (size_t)size);
+        RECV((uint8_t*)((size_t)ptr + (size_t)offs), (size_t)size);
       }
       int32_t res = dmp_dv_mem_to_device((dmp_dv_mem)(size_t)mem, (size_t)offs, (size_t)size, flags);
       SEND(&res, 4, false);
@@ -395,10 +404,15 @@ bool process_command(int sc, struct sockaddr_in& sin) {
       RECV(&size, 8);
       uint8_t flags = 0;
       RECV(&flags, 4);
+      DLOG("k_dmp_dv_mem_to_cpu: mem=%zu ptr=%zu offs=%zu size=%zu flags=%d\n",
+           (size_t)mem, (size_t)ptr, (size_t)offs, (size_t)size, flags);
       int32_t res = dmp_dv_mem_to_cpu((dmp_dv_mem)(size_t)mem, (size_t)offs, (size_t)size, flags);
+      DLOG(" => %d\n", (int)res);
       SEND(&res, 4, res ? false : true);
       if (!res) {
-        SEND((uint8_t*)(size_t)ptr + (size_t)offs, (size_t)size, false);
+        DLOG(" => sending %zu bytes\n", (size_t)size);
+        SEND((uint8_t*)((size_t)ptr + (size_t)offs), (size_t)size, false);
+        DLOG(" => sent %zu bytes\n", (size_t)size);
       }
       break;
     }
@@ -414,7 +428,7 @@ bool process_command(int sc, struct sockaddr_in& sin) {
     }
     default:
     {
-      ERR("%s: Received invalid cmd_id %d\n", format_time(), (int)cmd_id);
+      ERR("%s: Received invalid cmd_id %d\n", format_time(), (int)cmd_hdr.cmd_id);
       return false;
     }
   }
